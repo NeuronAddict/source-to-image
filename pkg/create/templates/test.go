@@ -56,18 +56,18 @@ container_exists() {
 container_ip() {
   if [[ "${HAS_PODMAN}" == "true" ]]
   then
-    ip=$(docker inspect --format="{{(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostIp }}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/')
+    ip=$(docker inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/')
     echo "IP = '$ip'" && exit 10
     [[ -z "${ip}" ]] && echo "localhost" || echo "${ip}"
   else
-    docker inspect --format="{{(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostIp }}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/'
+    docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/'
   fi
 }
 
 container_port() {
   [[ "${HAS_PODMAN}" == "true" ]] \
-  && docker inspect --format="{{(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostPort }}" "$(cat "${cid_file}")" \
-  || docker inspect --format="{{(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort }}" "$(cat "${cid_file}")"
+  && docker inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostPort {{"}}"}}" "$(cat "${cid_file}")" \
+  || docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort {{"}}"}}" "$(cat "${cid_file}")"
 }
 
 run_s2i_build() {
