@@ -14,6 +14,14 @@ const TestRunScript = `#!/bin/bash
 #
 IMAGE_NAME=${IMAGE_NAME-{{.ImageName}}-candidate}
 
+if [[ ! -z "$(echo $DOCKER_HOST | grep podman)" || ! -z "${FORCE_PODMAN}" ]]
+then
+  HAS_PODMAN=true
+  IMAGE_PREFIX="localhost/"
+else
+  HAS_PODMAN=false
+fi
+
 # Determining system utility executables (darwin compatibility check)
 READLINK_EXEC="readlink -zf"
 MKTEMP_EXEC="mktemp --suffix=.cid"
@@ -46,15 +54,24 @@ container_exists() {
 }
 
 container_ip() {
-  docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/'
+  if [[ "${HAS_PODMAN}" == "true" ]]
+  then
+    ip=$(docker inspect --format="{{(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostIp }}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/')
+    echo "IP = '$ip'" && exit 10
+    [[ -z "${ip}" ]] && echo "localhost" || echo "${ip}"
+  else
+    docker inspect --format="{{(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostIp }}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/'
+  fi
 }
 
 container_port() {
-  docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort {{"}}"}}" "$(cat "${cid_file}")"
+  [[ "${HAS_PODMAN}" == "true" ]] \
+  && docker inspect --format="{{(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostPort }}" "$(cat "${cid_file}")" \
+  || docker inspect --format="{{(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort }}" "$(cat "${cid_file}")"
 }
 
 run_s2i_build() {
-  s2i build --incremental=true ${s2i_args} ${test_dir}/test-app ${IMAGE_NAME} ${IMAGE_NAME}-testapp
+  s2i build --incremental=true ${s2i_args} ${test_dir}/test-app ${IMAGE_PREFIX}${IMAGE_NAME} ${IMAGE_NAME}-testapp
 }
 
 prepare() {
