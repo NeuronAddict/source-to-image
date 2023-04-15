@@ -18,8 +18,10 @@ if [[ ! -z "$(echo $DOCKER_HOST | grep podman)" || ! -z "${FORCE_PODMAN}" ]]
 then
   HAS_PODMAN=true
   IMAGE_PREFIX="localhost/"
+  DOCKER_BINARY=podman
 else
   HAS_PODMAN=false
+  DOCKER_BINARY=docker
 fi
 
 # Determining system utility executables (darwin compatibility check)
@@ -46,7 +48,7 @@ s2i_args="--pull-policy=never --loglevel=2"
 test_port=8080
 
 image_exists() {
-  docker inspect $1 &>/dev/null
+  $DOCKER_BINARY inspect $1 &>/dev/null
 }
 
 container_exists() {
@@ -56,7 +58,7 @@ container_exists() {
 container_ip() {
   if [[ "${HAS_PODMAN}" == "true" ]]
   then
-    ip=$(docker inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) 2>/dev/null | sed 's/0.0.0.0/localhost/')
+    ip=$(podman inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) 2>/dev/null | sed 's/0.0.0.0/localhost/')
     [[ -z "${ip}" ]] && echo "localhost" || echo "${ip}"
   else
     docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/'
@@ -99,17 +101,17 @@ prepare() {
 }
 
 run_test_application() {
-  docker run --rm --cidfile=${cid_file} -p ${test_port}:${test_port} ${IMAGE_PREFIX}${IMAGE_NAME}-testapp
+  $DOCKER_BINARY run --rm --cidfile=${cid_file} -p ${test_port}:${test_port} ${IMAGE_PREFIX}${IMAGE_NAME}-testapp
 }
 
 cleanup() {
   if [ -f $cid_file ]; then
     if container_exists; then
-      docker stop $(cat $cid_file)
+      $DOCKER_BINARY stop $(cat $cid_file)
     fi
   fi
   if image_exists ${IMAGE_PREFIX}${IMAGE_NAME}-testapp; then
-    docker rmi ${IMAGE_PREFIX}${IMAGE_NAME}-testapp
+    $DOCKER_BINARY rmi ${IMAGE_PREFIX}${IMAGE_NAME}-testapp
   fi
 }
 
