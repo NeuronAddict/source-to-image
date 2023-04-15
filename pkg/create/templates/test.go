@@ -189,14 +189,15 @@ cleanup
 
 // Makefile contains a sample Makefile which can build and test a container.
 const Makefile = `IMAGE_NAME = {{.ImageName}}
+DOCKER_BINARY = $(shell /bin/bash -c 'which podman docker | head -1' )
 
 .PHONY: build
 build:
-	docker build -t $(IMAGE_NAME) .
+	$(DOCKER_BINARY) build -t $(IMAGE_NAME) .
 
 .PHONY: test
 test:
-	docker build -t $(IMAGE_NAME)-candidate .
+	$(DOCKER_BINARY) build -t $(IMAGE_NAME)-candidate .
 	IMAGE_NAME=$(IMAGE_NAME)-candidate test/run
 `
 
