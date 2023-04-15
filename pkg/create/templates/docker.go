@@ -2,7 +2,7 @@ package templates
 
 // Dockerfile is a default Dockerfile laid down by s2i create
 const Dockerfile = `# {{.ImageName}}
-FROM openshift/base-centos7
+FROM docker.io/openshift/base-centos7
 
 # TODO: Put the maintainer name in the image metadata
 # LABEL maintainer="Your Name <your@email.com>"
