@@ -56,8 +56,7 @@ container_exists() {
 container_ip() {
   if [[ "${HAS_PODMAN}" == "true" ]]
   then
-    ip=$(docker inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/')
-    echo "IP = '$ip'" && exit 10
+    ip=$(docker inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) 2>/dev/null | sed 's/0.0.0.0/localhost/')
     [[ -z "${ip}" ]] && echo "localhost" || echo "${ip}"
   else
     docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostIp {{"}}"}}" $(cat $cid_file) | sed 's/0.0.0.0/localhost/'
@@ -65,18 +64,35 @@ container_ip() {
 }
 
 container_port() {
-  [[ "${HAS_PODMAN}" == "true" ]] \
-  && docker inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostPort {{"}}"}}" "$(cat "${cid_file}")" \
-  || docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort {{"}}"}}" "$(cat "${cid_file}")"
+  if [[ "${HAS_PODMAN}" == "true" ]]
+  then
+    podman inspect --format="{{"{{"}}(index .HostConfig.PortBindings \"$test_port/tcp\" 0).HostPort {{"}}"}}" "$(cat "${cid_file}")"
+  else
+    docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort {{"}}"}}" "$(cat "${cid_file}")"
+  fi
 }
 
 run_s2i_build() {
-  s2i build --incremental=true ${s2i_args} ${test_dir}/test-app ${IMAGE_PREFIX}${IMAGE_NAME} ${IMAGE_NAME}-testapp
+  if [[ "${HAS_PODMAN}" == "true" ]]
+  then
+    CONTAINER_FOLDER=$(mktemp -d)
+    s2i build --incremental=true ${s2i_args} "${test_dir}"/test-app ${IMAGE_PREFIX}${IMAGE_NAME} ${IMAGE_PREFIX}${IMAGE_NAME} --as-dockerfile "$CONTAINER_FOLDER"/Containerfile
+    echo "Containerfile is in $CONTAINER_FOLDER"
+    echo
+    echo '#############'
+    cat "$CONTAINER_FOLDER"/Containerfile
+    echo '#############'
+    echo
+    podman build -t ${IMAGE_PREFIX}${IMAGE_NAME}-testapp -f $CONTAINER_FOLDER/Containerfile $CONTAINER_FOLDER
+    rm -fr "$CONTAINER_FOLDER"
+  else
+    s2i build --incremental=true ${s2i_args} ${test_dir}/test-app ${IMAGE_NAME} ${IMAGE_NAME}-testapp
+  fi
 }
 
 prepare() {
-  if ! image_exists ${IMAGE_NAME}; then
-    echo "ERROR: The image ${IMAGE_NAME} must exist before this script is executed."
+  if ! image_exists ${IMAGE_PREFIX}${IMAGE_NAME}; then
+    echo "ERROR: The image ${IMAGE_PREFIX}${IMAGE_NAME} must exist before this script is executed."
     exit 1
   fi
   # s2i build requires the application is a valid 'Git' repository
@@ -89,7 +105,7 @@ prepare() {
 }
 
 run_test_application() {
-  docker run --rm --cidfile=${cid_file} -p ${test_port}:${test_port} ${IMAGE_NAME}-testapp
+  docker run --rm --cidfile=${cid_file} -p ${test_port}:${test_port} ${IMAGE_PREFIX}${IMAGE_NAME}-testapp
 }
 
 cleanup() {
@@ -98,8 +114,8 @@ cleanup() {
       docker stop $(cat $cid_file)
     fi
   fi
-  if image_exists ${IMAGE_NAME}-testapp; then
-    docker rmi ${IMAGE_NAME}-testapp
+  if image_exists ${IMAGE_PREFIX}${IMAGE_NAME}-testapp; then
+    docker rmi ${IMAGE_PREFIX}${IMAGE_NAME}-testapp
   fi
 }
 
@@ -127,7 +143,7 @@ wait_for_cid() {
 
 test_usage() {
   echo "Testing 's2i usage'..."
-  s2i usage ${s2i_args} ${IMAGE_NAME} &>/dev/null
+  s2i usage ${s2i_args} ${IMAGE_PREFIX}${IMAGE_NAME} &>/dev/null
 }
 
 test_connection() {
