@@ -77,12 +77,6 @@ run_s2i_build() {
   then
     CONTAINER_FOLDER=$(mktemp -d)
     s2i build --incremental=true ${s2i_args} "${test_dir}"/test-app ${IMAGE_PREFIX}${IMAGE_NAME} ${IMAGE_PREFIX}${IMAGE_NAME} --as-dockerfile "$CONTAINER_FOLDER"/Containerfile
-    echo "Containerfile is in $CONTAINER_FOLDER"
-    echo
-    echo '#############'
-    cat "$CONTAINER_FOLDER"/Containerfile
-    echo '#############'
-    echo
     podman build -t ${IMAGE_PREFIX}${IMAGE_NAME}-testapp -f $CONTAINER_FOLDER/Containerfile $CONTAINER_FOLDER
     rm -fr "$CONTAINER_FOLDER"
   else
